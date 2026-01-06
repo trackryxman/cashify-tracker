@@ -3,12 +3,10 @@ from bs4 import BeautifulSoup
 import json
 import os
 
-URLS = [
-    "https://www.cashify.in/buy/search?plid=35",
-    "https://www.cashify.in/buy-refurbished-laptops"
-]
+GAMING_URL = "https://www.cashify.in/buy-refurbished-laptops/gaming"
+HIGH_PERF_URL = "https://www.cashify.in/buy-refurbished-laptops/high-performance"
 
-KEYWORDS = ["Gaming Series", "TUF", "Nitro"]
+HP_KEYWORDS = ["Nitro", "TUF", "Omen", "Predator"]
 STATE_FILE = "products.json"
 
 headers = {
@@ -17,25 +15,45 @@ headers = {
 
 current_products = set()
 
-for url in URLS:
+def collect_products(url, keywords=None):
     r = requests.get(url, headers=headers, timeout=20)
     soup = BeautifulSoup(r.text, "html.parser")
 
     for a in soup.find_all("a", href=True):
         text = a.get_text(" ", strip=True)
 
-        # must match keyword
-        if not any(k in text for k in KEYWORDS):
-            continue
-
         # skip out of stock
         if "out of stock" in text.lower():
             continue
 
+        # keyword filter (only for high performance page)
+        if keywords:
+            if not any(k in text for k in keywords):
+                continue
+
         link = "https://www.cashify.in" + a["href"]
         current_products.add(text + " | " + link)
 
-# load previous state
+
+# collect from both pages
+collect_products(GAMING_URL)
+collect_products(HIGH_PERF_URL, HP_KEYWORDS)
+
+# load old state
 old_products = set()
 if os.path.exists(STATE_FILE):
-    with open(STATE_FILE, "r")
+    with open(STATE_FILE, "r") as f:
+        old_products = set(json.load(f))
+
+# find new products
+new_products = current_products - old_products
+
+# save current state
+with open(STATE_FILE, "w") as f:
+    json.dump(list(current_products), f)
+
+# create alert file if new products found
+if new_products:
+    with open("alert.txt", "w") as f:
+        for p in new_products:
+            f.write(p + "\n")
