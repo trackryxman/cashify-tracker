@@ -12,6 +12,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -23,12 +24,12 @@ jobs:
 
       - run: python tracker.py
 
-      - name: Create issue if new stock
-        if: hashFiles('new.txt') != ''
+      - name: Create issue if new stock found
+        if: hashFiles('alert.txt') != ''
         uses: peter-evans/create-issue-from-file@v4
         with:
           title: "🆕 New Gaming Laptop Stock on Cashify"
-          content-filepath: new.txt
+          content-filepath: alert.txt
 
       - name: Save state
         run: |
