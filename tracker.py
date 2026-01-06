@@ -1,7 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
 import json
-import sys
 import os
 
 URLS = [
@@ -12,43 +11,39 @@ URLS = [
 STATE_FILE = "products.json"
 headers = {"User-Agent": "Mozilla/5.0"}
 
-current_products = set()
+current = set()
 
 for url in URLS:
     r = requests.get(url, headers=headers)
     soup = BeautifulSoup(r.text, "html.parser")
 
-    cards = soup.find_all("a", href=True)
+    for a in soup.find_all("a", href=True):
+        text = a.get_text(" ", strip=True).lower()
 
-    for card in cards:
-        text = card.get_text(" ", strip=True).lower()
-
-        # skip out of stock
+        if "gaming series" not in text:
+            continue
         if "out of stock" in text:
             continue
 
-        # must be gaming series
-        if "Gaming Series" in text:
-            link = "https://www.cashify.in" + card["href"]
-            current_products.add(text + "|" + link)
+        link = "https://www.cashify.in" + a["href"]
+        current.add(text + " | " + link)
 
-# load previous state
-old_products = set()
+old = set()
 if os.path.exists(STATE_FILE):
     with open(STATE_FILE, "r") as f:
-        old_products = set(json.load(f))
+        old = set(json.load(f))
 
-# find new ones
-new_products = current_products - old_products
+new_items = current - old
 
-# save current state
 with open(STATE_FILE, "w") as f:
-    json.dump(list(current_products), f)
+    json.dump(list(current), f)
 
-if new_products:
-    print("NEW GAMING LAPTOP ADDED:")
-    for p in new_products:
-        print(p)
-    sys.exit(1)  # email alert
-
-print("No new in-stock gaming laptop")
+if new_items:
+    print("NEW ITEMS FOUND:")
+    for i in new_items:
+        print(i)
+    # signal new item without failing
+    with open("new.txt", "w") as f:
+        f.write("\n".join(new_items))
+else:
+    print("No new gaming laptop")
