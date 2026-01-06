@@ -9,51 +9,52 @@ HIGH_PERF_URL = "https://www.cashify.in/buy-refurbished-laptops/high-performance
 HP_KEYWORDS = ["Nitro", "TUF", "Omen", "Predator"]
 STATE_FILE = "products.json"
 
-headers = {
-    "User-Agent": "Mozilla/5.0"
-}
+headers = {"User-Agent": "Mozilla/5.0"}
 
-current_products = set()
+current = {}
 
-def collect_products(url, keywords=None):
+def process_page(url, keywords=None):
     r = requests.get(url, headers=headers, timeout=20)
     soup = BeautifulSoup(r.text, "html.parser")
 
     for a in soup.find_all("a", href=True):
-        text = a.get_text(" ", strip=True)
+        name = a.get_text(" ", strip=True)
+        link = "https://www.cashify.in" + a["href"]
 
-        # skip out of stock
-        if "out of stock" in text.lower():
+        if keywords and not any(k in name for k in keywords):
             continue
 
-        # keyword filter (only for high performance page)
-        if keywords:
-            if not any(k in text for k in keywords):
-                continue
+        in_stock = "out of stock" not in name.lower()
+        current[name] = {
+            "link": link,
+            "in_stock": in_stock
+        }
 
-        link = "https://www.cashify.in" + a["href"]
-        current_products.add(text + " | " + link)
-
-
-# collect from both pages
-collect_products(GAMING_URL)
-collect_products(HIGH_PERF_URL, HP_KEYWORDS)
+# collect products
+process_page(GAMING_URL)
+process_page(HIGH_PERF_URL, HP_KEYWORDS)
 
 # load old state
-old_products = set()
+old = {}
 if os.path.exists(STATE_FILE):
     with open(STATE_FILE, "r") as f:
-        old_products = set(json.load(f))
+        old = json.load(f)
 
-# find new products
-new_products = current_products - old_products
+alerts = []
+
+for name, data in current.items():
+    if name not in old and data["in_stock"]:
+        alerts.append("NEW: " + name + " | " + data["link"])
+    elif name in old:
+        if not old[name]["in_stock"] and data["in_stock"]:
+            alerts.append("RESTOCK: " + name + " | " + data["link"])
 
 # save current state
 with open(STATE_FILE, "w") as f:
-    json.dump(list(current_products), f)
+    json.dump(current, f)
 
-# create alert file if new products found
-if new_products:
+# create alert file
+if alerts:
     with open("alert.txt", "w") as f:
-        for p in new_products:
-            f.write(p + "\n")
+        for a in alerts:
+            f.write(a + "\n")
