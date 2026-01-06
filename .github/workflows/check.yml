@@ -1,5 +1,9 @@
 name: Cashify Gaming Laptop Tracker
 
+permissions:
+  contents: write
+  issues: write
+
 on:
   schedule:
     - cron: "* * * * *"
